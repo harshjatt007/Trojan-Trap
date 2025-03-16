@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { CloudUpload, AlertCircle, CheckCircle, FileText, Clock } from 'lucide-react';
 
 // Load Stripe
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
@@ -36,16 +37,20 @@ const PaymentForm = ({ clientSecret, onSuccess, onError }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <PaymentElement />
-      <button
-        type="submit"
-        disabled={!stripe || isProcessing}
-        className="mt-4 bg-blue-500 text-white px-4 py-2 rounded"
-      >
-        {isProcessing ? 'Processing...' : 'Pay Now'}
-      </button>
-    </form>
+    <div className="bg-white p-6 rounded-lg shadow-md">
+      <h2 className="text-xl font-bold mb-4 text-center">Complete Payment to View Report</h2>
+      <p className="text-center mb-6 text-gray-600">Secure payment via Stripe</p>
+      <form onSubmit={handleSubmit}>
+        <PaymentElement className="mb-6" />
+        <button
+          type="submit"
+          disabled={!stripe || isProcessing}
+          className="w-full bg-green-500 hover:bg-green-600 text-white py-3 px-4 rounded-md transition-all duration-300 font-medium"
+        >
+          {isProcessing ? 'Processing...' : 'Pay ₹100 to View Report'}
+        </button>
+      </form>
+    </div>
   );
 };
 
@@ -56,17 +61,18 @@ const Scanner = () => {
   const [report, setReport] = useState(null);
   const [paymentIntentId, setPaymentIntentId] = useState(null);
   const [scanId, setScanId] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
 
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
+    setSelectedFile(file);
     setIsUploading(true);
     setErrorMessage('');
     setReport(null);
 
-    console.log("File selected:", file); // Log the selected file
-    const formData = new FormData(); 
+    const formData = new FormData();
     formData.append('file', file);
 
     try {
@@ -97,77 +103,110 @@ const Scanner = () => {
   };
 
   const formatReport = (report) => {
-    const { fileName, fileSize, fileHash, scannedAt, isMalicious, threatLevel, matchedHashes } = report;
+    const { fileName, fileSize, fileHash, scannedAt, isMalicious, details } = report;
 
     return (
-      <div className="bg-gray-100 p-4 rounded-md shadow-md">
-        <h2 className="text-2xl font-bold mb-4">Scan Report</h2>
-        <div className="mb-2">
-          <strong>File Name:</strong> {fileName}
-        </div>
-        <div className="mb-2">
-          <strong>File Size:</strong> {fileSize}
-        </div>
-        <div className="mb-2">
-          <strong>File Hash:</strong> <span className="text-gray-600">{fileHash}</span>
-        </div>
-        <div className="mb-2">
-          <strong>Scan Date:</strong> {new Date(scannedAt).toLocaleString()}
-        </div>
-        <div className="mb-4">
-          <strong>Threat Level:</strong> <span className={isMalicious ? "text-red-600 font-bold" : "text-green-600 font-bold"}>{isMalicious ? 'Malicious' : 'Safe'}</span>
-        </div>
-        {isMalicious && (
-          <div>
-            <strong>Matched Hashes:</strong>
-            <ul className="list-disc ml-6">
-              {matchedHashes.map((hash, index) => (
-                <li key={index}>{hash}</li>
-              ))}
-            </ul>
+      <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">Scan Report</h2>
+          <div className={`px-3 py-1 rounded-full text-white text-sm font-medium ${isMalicious ? 'bg-red-500' : 'bg-green-500'}`}>
+            {isMalicious ? 'Malicious' : 'Safe'}
           </div>
-        )}
-        <div className="mt-4">
-          <strong>Status:</strong> <span className={isMalicious ? "text-red-600" : "text-green-600"}>{isMalicious ? 'Malicious - Immediate Action Required' : 'Safe - No Threat Detected'}</span>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="space-y-2">
+            <div className="flex items-center">
+              <FileText className="w-5 h-5 mr-2 text-gray-500" />
+              <span className="font-medium">File Name:</span>
+              <span className="ml-2 text-gray-600">{fileName}</span>
+            </div>
+            <div className="flex items-center">
+              <Clock className="w-5 h-5 mr-2 text-gray-500" />
+              <span className="font-medium">Scan Date:</span>
+              <span className="ml-2 text-gray-600">{new Date(scannedAt).toLocaleString()}</span>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div>
+              <span className="font-medium">File Size:</span>
+              <span className="ml-2 text-gray-600">{fileSize}</span>
+            </div>
+            <div>
+              <span className="font-medium">SHA-256 Hash:</span>
+              <div className="mt-1 p-2 bg-gray-100 rounded text-xs font-mono break-all">{fileHash}</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="border-t pt-4">
+          <h3 className="font-bold text-lg mb-2">Analysis Result</h3>
+          <div className={`flex items-start p-4 rounded-md ${isMalicious ? 'bg-red-50' : 'bg-green-50'}`}>
+            {isMalicious ? (
+              <AlertCircle className="w-6 h-6 mr-3 text-red-500 flex-shrink-0 mt-1" />
+            ) : (
+              <CheckCircle className="w-6 h-6 mr-3 text-green-500 flex-shrink-0 mt-1" />
+            )}
+            <div>
+              <p className="font-medium">{details.description}</p>
+              <p className="mt-2 text-sm text-gray-600">{details.recommendation}</p>
+            </div>
+          </div>
         </div>
       </div>
     );
   };
 
   return (
-    <div className="p-6">
-      <h1 className="text-3xl font-bold mb-6">File Scanner</h1>
+    <div className="max-w-3xl mx-auto p-6">
+      <h1 className="text-3xl font-bold mb-8 text-center">File Scanner</h1>
       
-      <button
-        type="button"
-        onClick={() => document.getElementById('file-input').click()}
-        className="mb-4 p-2 border border-gray-300 rounded-md"
-      >
-        Upload to Scan
-      </button>
-      <input
-        id="file-input"
-        type="file"
-        onChange={handleFileUpload}
-        disabled={isUploading}
-        className="hidden"
-      />
-      {isUploading && <p>Uploading...</p>}
+      {!selectedFile && !isUploading && !clientSecret && !report && (
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
+          <CloudUpload className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+          <p className="text-lg mb-6 text-gray-600">Drag and drop your file here or click to browse</p>
+          <label className="bg-green-500 hover:bg-green-600 text-white py-3 px-6 rounded-md cursor-pointer transition-all duration-300 inline-block font-medium">
+            Select File
+            <input
+              type="file"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+          </label>
+        </div>
+      )}
+      
+      {selectedFile && !report && !clientSecret && (
+        <div className="text-center p-6 bg-white rounded-lg shadow-md">
+          <p className="font-medium mb-2">Selected File:</p>
+          <p className="text-gray-600 mb-4">{selectedFile.name}</p>
+          {isUploading ? (
+            <div className="flex flex-col items-center">
+              <div className="loader-circle mb-4"></div>
+              <p>Uploading and analyzing file...</p>
+            </div>
+          ) : (
+            <p className="text-green-600 font-medium">File uploaded successfully!</p>
+          )}
+        </div>
+      )}
 
       {/* Stripe Payment */}
       {clientSecret && !report && (
         <Elements stripe={stripePromise} options={{ clientSecret }}>
-          <div className='text-center'>
-          <h1 className='text-red-500 font-bold'>100 INR Per Report</h1>
-          </div>
-          
-          <PaymentForm onSuccess={handlePaymentSuccess} onError={setErrorMessage} />
+          <PaymentForm 
+            clientSecret={clientSecret} 
+            onSuccess={handlePaymentSuccess} 
+            onError={setErrorMessage} 
+          />
         </Elements>
+      )}
 
       {/* Error Message */}
       {errorMessage && (
-        <div className="text-red-600 font-semibold mt-4">
-          {errorMessage}
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mt-6">
+          <p className="font-medium">Error</p>
+          <p className="text-sm">{errorMessage}</p>
         </div>
       )}
 
@@ -178,3 +217,4 @@ const Scanner = () => {
 };
 
 export default Scanner;
+

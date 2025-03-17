@@ -1,0 +1,8 @@
+<!-- This would be a real image file, but for this example, I'll create a placeholder SVG -->
+<svg xmlns="http://www.w3.org/2000/svg" width="150" height="150" viewBox="0 0 150 150">
+  <rect width="150" height="150" fill="#f0f0f0"/>
+  <text x="75" y="75" font-family="Arial" font-size="14" text-anchor="middle" dominant-baseline="middle">Live Updates Image</text>
+  <circle cx="75" cy="75" r="50" stroke="green" stroke-width="2" fill="none"/>
+  <circle cx="75" cy="75" r="5" fill="red"/>
+</svg>
+

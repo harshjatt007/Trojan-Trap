@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { Download, FileText, Clock, AlertCircle, CheckCircle, RefreshCw } from "lucide-react"
-import axios from "axios"
+import { Download, FileText, Clock, AlertCircle, CheckCircle, RefreshCw, AlertTriangle } from "lucide-react"
 import { useNavigate } from "react-router-dom"
+import { getThreatLevelColor } from "../libs/scanUtils"
 
 const Report = () => {
   const [report, setReport] = useState(null)
@@ -39,30 +39,14 @@ const Report = () => {
         console.error("Error parsing stored report:", error)
       }
     } else if (reportId) {
-      // If we have a reportId but no report, fetch it from the server
-      fetchReport(reportId)
+      // If we have a reportId but no report, try to fetch it
+      setLoading(true)
+      setTimeout(() => {
+        setLoading(false)
+        setError("Report not found. It may have expired or been removed.")
+      }, 1500)
     }
   }, [])
-
-  const fetchReport = async (reportId) => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000"
-      const response = await axios.get(`${apiUrl}/report/${reportId}`)
-
-      if (response.data.success && response.data.report) {
-        setReport(response.data.report)
-        localStorage.setItem("scanReport", JSON.stringify(response.data.report))
-      }
-    } catch (error) {
-      console.error("Error fetching report:", error)
-      setError("Failed to fetch report. It may have expired or been removed.")
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleDownloadReport = () => {
     const reportData = report || exampleReport
@@ -76,7 +60,7 @@ File Name: ${reportData.fileName}
 File Size: ${reportData.fileSize}
 SHA-256 Hash: ${reportData.fileHash}
 Scan Date: ${new Date(reportData.scannedAt).toLocaleString()}
-Threat Status: ${reportData.isMalicious ? "MALICIOUS" : "SAFE"}
+Threat Status: ${reportData.isMalicious ? "MALICIOUS" : reportData.scanStatus === "suspicious" ? "SUSPICIOUS" : "SAFE"}
 Threat Level: ${reportData.threatLevel || "N/A"}
 
 ANALYSIS DETAILS
@@ -86,6 +70,16 @@ ${reportData.details.description}
 RECOMMENDATION
 ------------
 ${reportData.details.recommendation}
+
+${
+  reportData.threats && reportData.threats.length > 0
+    ? `
+DETECTED THREATS
+---------------
+${reportData.threats.map((threat) => `- ${threat.name} (${threat.category}, ${threat.severity} severity)`).join("\n")}
+`
+    : ""
+}
 
 ADDITIONAL INFORMATION
 --------------------
@@ -106,6 +100,36 @@ For more information, visit https://trojan-trap-seven.vercel.app/
 
   const handleScanNewFile = () => {
     navigate("/scanner")
+  }
+
+  // Render threat categories as a bar chart
+  const renderThreatCategories = (categories) => {
+    if (!categories) return null
+
+    const items = [
+      { name: "Virus", value: categories.virus, color: "bg-red-500" },
+      { name: "Spyware", value: categories.spyware, color: "bg-purple-500" },
+      { name: "Trojan", value: categories.trojan, color: "bg-yellow-500" },
+      { name: "Ransomware", value: categories.ransomware, color: "bg-blue-500" },
+      { name: "Adware", value: categories.adware, color: "bg-green-500" },
+    ].filter((item) => item.value > 0)
+
+    return (
+      <div className="mt-4 space-y-3">
+        <h4 className="font-medium text-gray-700">Threat Analysis:</h4>
+        {items.map((item, index) => (
+          <div key={index} className="space-y-1">
+            <div className="flex justify-between text-sm">
+              <span>{item.name}</span>
+              <span>{item.value}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2.5">
+              <div className={`${item.color} h-2.5 rounded-full`} style={{ width: `${item.value}%` }}></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    )
   }
 
   const reportData = report || exampleReport
@@ -142,10 +166,14 @@ For more information, visit https://trojan-trap-seven.vercel.app/
             <h2 className="text-2xl font-bold">Scan Details</h2>
             <div
               className={`px-3 py-1 rounded-full text-white text-sm font-medium ${
-                reportData.isMalicious ? "bg-red-500" : "bg-green-500"
+                reportData.isMalicious
+                  ? "bg-red-500"
+                  : reportData.scanStatus === "suspicious"
+                    ? "bg-yellow-500"
+                    : "bg-green-500"
               }`}
             >
-              {reportData.isMalicious ? "Malicious" : "Safe"}
+              {reportData.isMalicious ? "Malicious" : reportData.scanStatus === "suspicious" ? "Suspicious" : "Safe"}
             </div>
           </div>
 
@@ -183,21 +211,25 @@ For more information, visit https://trojan-trap-seven.vercel.app/
                 </div>
                 <div>
                   <span className="text-gray-600">Status:</span>
-                  <span className={`ml-2 font-medium ${reportData.isMalicious ? "text-red-600" : "text-green-600"}`}>
-                    {reportData.isMalicious ? "Malicious" : "Safe"}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gray-600">Threat Level:</span>
                   <span
                     className={`ml-2 font-medium ${
-                      reportData.threatLevel === "High"
+                      reportData.isMalicious
                         ? "text-red-600"
-                        : reportData.threatLevel === "Medium"
+                        : reportData.scanStatus === "suspicious"
                           ? "text-yellow-600"
                           : "text-green-600"
                     }`}
                   >
+                    {reportData.isMalicious
+                      ? "Malicious"
+                      : reportData.scanStatus === "suspicious"
+                        ? "Suspicious"
+                        : "Safe"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Threat Level:</span>
+                  <span className={`ml-2 font-medium ${getThreatLevelColor(reportData.threatLevel)}`}>
                     {reportData.threatLevel || "Low"}
                   </span>
                 </div>
@@ -212,15 +244,52 @@ For more information, visit https://trojan-trap-seven.vercel.app/
             </div>
           </div>
 
+          {/* Threat categories visualization */}
+          {reportData.detectionCategories && renderThreatCategories(reportData.detectionCategories)}
+
+          {/* Specific threats */}
+          {reportData.threats && reportData.threats.length > 0 && (
+            <div className="mt-4 mb-4">
+              <h4 className="font-medium text-gray-700 mb-2">Detected Threats:</h4>
+              <div className="space-y-2">
+                {reportData.threats.map((threat, index) => (
+                  <div key={index} className="bg-gray-50 p-3 rounded-md border border-gray-200">
+                    <div className="flex justify-between">
+                      <span className="font-medium">{threat.name}</span>
+                      <span
+                        className={`text-sm px-2 py-0.5 rounded-full ${
+                          threat.severity === "critical"
+                            ? "bg-red-100 text-red-800"
+                            : threat.severity === "high"
+                              ? "bg-orange-100 text-orange-800"
+                              : "bg-yellow-100 text-yellow-800"
+                        }`}
+                      >
+                        {threat.severity.charAt(0).toUpperCase() + threat.severity.slice(1)}
+                      </span>
+                    </div>
+                    <div className="text-sm text-gray-600 mt-1">Category: {threat.category}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="border-t pt-6 mt-6">
             <h3 className="font-bold text-xl mb-4 text-gray-800">Analysis Result</h3>
             <div
               className={`flex items-start p-5 rounded-md ${
-                reportData.isMalicious ? "bg-red-50 border border-red-100" : "bg-green-50 border border-green-100"
+                reportData.isMalicious
+                  ? "bg-red-50 border border-red-100"
+                  : reportData.scanStatus === "suspicious"
+                    ? "bg-yellow-50 border border-yellow-100"
+                    : "bg-green-50 border border-green-100"
               }`}
             >
               {reportData.isMalicious ? (
                 <AlertCircle className="w-6 h-6 mr-4 text-red-500 flex-shrink-0 mt-1" />
+              ) : reportData.scanStatus === "suspicious" ? (
+                <AlertTriangle className="w-6 h-6 mr-4 text-yellow-500 flex-shrink-0 mt-1" />
               ) : (
                 <CheckCircle className="w-6 h-6 mr-4 text-green-500 flex-shrink-0 mt-1" />
               )}
@@ -255,4 +324,3 @@ For more information, visit https://trojan-trap-seven.vercel.app/
 }
 
 export default Report
-

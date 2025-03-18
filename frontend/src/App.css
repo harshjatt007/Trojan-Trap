@@ -67,18 +67,6 @@ label[for="file-upload"]:hover {
   }
 }
 
-@keyframes scramble {
-  0% {
-    content: attr(data-value);
-  }
-  50% {
-    content: attr(data-scrambled);
-  }
-  100% {
-    content: attr(data-value);
-  }
-}
-
 @keyframes float {
   0% {
     transform: translateY(0px);
@@ -301,5 +289,19 @@ button:hover {
 /* Navbar hover effects */
 .mix-blend-difference {
   mix-blend-mode: difference;
+}
+
+/* Navbar active indicator */
+.navbar_main {
+  position: relative;
+}
+
+.navbar_main .active-indicator {
+  position: absolute;
+  height: 100%;
+  background-color: #000;
+  border-radius: 9999px;
+  transition: all 0.3s ease;
+  z-index: 0;
 }
 

@@ -7,47 +7,15 @@ import { CloudUpload, AlertCircle, CheckCircle, FileText, Clock, Download } from
 
 const Scanner = () => {
   const [isUploading, setIsUploading] = useState(false)
+  const [isScanning, setIsScanning] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
   const [report, setReport] = useState(null)
   const [selectedFile, setSelectedFile] = useState(null)
-  const [scanId, setScanId] = useState(null)
-  const [paymentIntentId, setPaymentIntentId] = useState(null)
-  const [reportId, setReportId] = useState(null)
   const navigate = useNavigate()
 
-  // Mock payment process for development
-  const mockPaymentProcess = async () => {
-    if (!scanId || !paymentIntentId) {
-      setErrorMessage("Missing scan ID or payment intent ID")
-      return
-    }
-
-    try {
-      setIsUploading(true)
-      // Use the correct API URL based on environment
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000"
-
-      const response = await axios.post(`${apiUrl}/verify-payment`, {
-        paymentIntentId,
-        scanId,
-      })
-
-      if (response.data.success && response.data.report) {
-        setReport(response.data.report)
-        setReportId(response.data.reportId)
-
-        // Store the report in localStorage for the Report page
-        localStorage.setItem("scanReport", JSON.stringify(response.data.report))
-        localStorage.setItem("reportId", response.data.reportId)
-      } else {
-        setErrorMessage("Failed to verify payment. Please try again.")
-      }
-    } catch (error) {
-      console.error("Payment verification error:", error)
-      setErrorMessage("Failed to fetch report. Contact support.")
-    } finally {
-      setIsUploading(false)
-    }
+  // Function to generate a unique ID without using crypto
+  const generateUniqueId = () => {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2)
   }
 
   const handleFileUpload = async (event) => {
@@ -69,18 +37,46 @@ const Scanner = () => {
       const response = await axios.post(`${apiUrl}/scan-file`, formData)
 
       if (response.data.success) {
-        setScanId(response.data.scanId)
-        setPaymentIntentId(response.data.paymentIntentId)
+        // Store scan ID and payment intent ID
+        const { scanId, paymentIntentId } = response.data
 
         // For development, automatically process the payment
-        setTimeout(() => {
-          mockPaymentProcess()
-        }, 2000)
+        setIsScanning(true)
+        await processPayment(scanId, paymentIntentId)
       }
     } catch (error) {
       console.error("Upload error:", error)
       setErrorMessage(error.response?.data?.error || "Upload failed. Try again.")
       setIsUploading(false)
+    }
+  }
+
+  const processPayment = async (scanId, paymentIntentId) => {
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000"
+
+      const response = await axios.post(`${apiUrl}/verify-payment`, {
+        scanId,
+        paymentIntentId,
+      })
+
+      if (response.data.success && response.data.report) {
+        setReport(response.data.report)
+
+        // Store the report in localStorage for the Report page
+        localStorage.setItem("scanReport", JSON.stringify(response.data.report))
+        if (response.data.reportId) {
+          localStorage.setItem("reportId", response.data.reportId)
+        }
+      } else {
+        setErrorMessage("Failed to verify payment. Please try again.")
+      }
+    } catch (error) {
+      console.error("Payment verification error:", error)
+      setErrorMessage("Failed to fetch report. Contact support.")
+    } finally {
+      setIsUploading(false)
+      setIsScanning(false)
     }
   }
 
@@ -177,7 +173,7 @@ const Scanner = () => {
           {isUploading ? (
             <div className="flex flex-col items-center">
               <div className="loader-circle mb-4"></div>
-              <p>Uploading and analyzing file...</p>
+              <p>{isScanning ? "Scanning file..." : "Uploading file..."}</p>
             </div>
           ) : (
             <p className="text-green-600 font-medium">File uploaded successfully!</p>

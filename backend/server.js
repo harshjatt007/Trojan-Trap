@@ -2,7 +2,6 @@ import express from "express"
 import crypto from "crypto"
 import fs from "fs"
 import multer from "multer"
-import axios from "axios"
 import cors from "cors"
 import unzipper from "unzipper"
 import { fileURLToPath } from "url"
@@ -81,9 +80,9 @@ const upload = multer({
 }).single("file")
 
 // Global variable for malicious hashes
-let maliciousHashes = new Set()
+const maliciousHashes = new Set()
 const pendingScans = new Map()
-const completedScans = new Map() // Store completed scans for retrieval
+const completedScans = new Map()
 
 // Function to check if a file exists
 function fileExists(filePath) {
@@ -94,56 +93,75 @@ function fileExists(filePath) {
   }
 }
 
-async function downloadAndExtractMalwareBazaar() {
-  const zipFilePath = path.join(__dirname, "MalwareBazaar.zip")
-  const csvFilePath = path.join(__dirname, "full.csv")
-
+// Load malware data from existing files
+async function loadMalwareData() {
   try {
-    // Skip download if files already exist
+    console.log("Loading malware data...")
+
+    // Check for MalwareBazaar.zip
+    const zipFilePath = path.join(__dirname, "MalwareBazaar.zip")
+    const csvFilePath = path.join(__dirname, "full.csv")
+
     if (fileExists(csvFilePath)) {
-      console.log("CSV file already exists, skipping download")
-      return
+      console.log("CSV file found, parsing...")
+      await parseMalwareBazaarCsv(csvFilePath)
+    } else if (fileExists(zipFilePath)) {
+      console.log("ZIP file found, extracting...")
+      await extractAndParseMalwareBazaar(zipFilePath)
+    } else {
+      console.log("No malware data files found, using test data")
+      // Add some test hashes for development
+      addTestHashes()
     }
 
-    console.log("Downloading data...")
-    const response = await axios.get("https://bazaar.abuse.ch/export/csv/full/", { responseType: "stream" })
-    const writer = fs.createWriteStream(zipFilePath)
-    response.data.pipe(writer)
+    console.log(`Total malicious hashes loaded: ${maliciousHashes.size}`)
+  } catch (error) {
+    console.error("Error loading malware data:", error)
+    console.log("Using test hashes instead")
+    addTestHashes()
+  }
+}
 
-    await new Promise((resolve, reject) => {
-      writer.on("finish", resolve)
-      writer.on("error", reject)
-    })
+function addTestHashes() {
+  // Add some test hashes for development
+  maliciousHashes.add("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+  maliciousHashes.add("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+  maliciousHashes.add("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")
+  console.log("Added test hashes for development")
+}
 
-    console.log("Extracting data...")
+async function extractAndParseMalwareBazaar(zipFilePath) {
+  try {
+    console.log("Extracting ZIP file...")
     await fs
       .createReadStream(zipFilePath)
       .pipe(unzipper.Extract({ path: __dirname }))
       .promise()
 
-    console.log("Zip extracted successfully.")
+    console.log("ZIP extracted successfully")
+
+    // Parse the CSV file
+    const csvFilePath = path.join(__dirname, "full.csv")
+    if (fileExists(csvFilePath)) {
+      await parseMalwareBazaarCsv(csvFilePath)
+    }
   } catch (error) {
-    console.error("Error downloading or extracting MalwareBazaar:", error)
-    // Don't throw error, continue with empty set
-    console.log("Continuing with empty malicious hash set")
+    console.error("Error extracting ZIP file:", error)
+    throw error
   }
 }
 
-async function parseMalwareBazaarCsv() {
+async function parseMalwareBazaarCsv(csvFilePath) {
   try {
-    console.log("Parsing CSV...")
-    const csvFilePath = path.join(__dirname, "full.csv")
-
-    if (!fileExists(csvFilePath)) {
-      console.log("CSV file not found, continuing with empty set")
-      return
-    }
+    console.log("Parsing CSV file...")
 
     const stream = fs.createReadStream(csvFilePath).pipe(csv())
 
     for await (const row of stream) {
-      const hashColumns = ["sha256_hash"] // Adjust according to your CSV columns
-      for (const col of hashColumns) {
+      // Try different possible column names for SHA256 hash
+      const possibleColumns = ["sha256_hash", "sha256", "hash", "_1", "_2", "_3"]
+
+      for (const col of possibleColumns) {
         if (row[col]) {
           const hash = row[col].replace(/"/g, "").trim().toLowerCase()
           if (hash && hash.length === 64) {
@@ -153,36 +171,10 @@ async function parseMalwareBazaarCsv() {
       }
     }
 
-    console.log(`Parsed ${maliciousHashes.size} malicious hashes.`)
+    console.log(`Parsed ${maliciousHashes.size} malicious hashes from CSV`)
   } catch (error) {
-    console.error("Error parsing CSV:", error)
-    console.log("Continuing with empty malicious hash set")
-  }
-}
-
-async function loadMaliciousHashes() {
-  try {
-    console.log("Loading malicious hashes into memory...")
-    const hashFilePath = path.join(__dirname, "malicious_hashes.txt")
-
-    if (fileExists(hashFilePath)) {
-      const data = fs.readFileSync(hashFilePath, "utf-8")
-      maliciousHashes = new Set(data.split("\n").map((hash) => hash.trim().toLowerCase()))
-    }
-
-    // If we don't have any hashes yet, add some test hashes for development
-    if (maliciousHashes.size === 0) {
-      console.log("No hashes loaded, adding test hashes for development")
-      // Add some test hashes for development
-      maliciousHashes.add("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-      maliciousHashes.add("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
-      maliciousHashes.add("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")
-    }
-
-    console.log(`Total malicious hashes loaded: ${maliciousHashes.size}`)
-  } catch (error) {
-    console.error("Error loading malicious hashes:", error)
-    console.log("Continuing with empty malicious hash set")
+    console.error("Error parsing CSV file:", error)
+    throw error
   }
 }
 
@@ -192,7 +184,7 @@ function calculateFileHash(filePath, algorithm = "sha256") {
     const stream = fs.createReadStream(filePath)
 
     stream.on("data", (data) => hash.update(data))
-    stream.on("end", () => resolve(hash.digest("hex").toLowerCase())) // Make sure the hash is lowercase
+    stream.on("end", () => resolve(hash.digest("hex").toLowerCase()))
     stream.on("error", (err) => reject(err))
   })
 }
@@ -223,7 +215,7 @@ app.post("/scan-file", (req, res) => {
         paymentIntent = await stripe.paymentIntents.create({
           amount: 500,
           currency: "inr",
-          description: "File scan service for export transactions",
+          description: "File scan service",
           shipping: {
             name: "Customer Name",
             address: {
@@ -326,7 +318,7 @@ app.post("/verify-payment", async (req, res) => {
       fileType: scanResult.fileName.split(".").pop().toUpperCase() || "UNKNOWN",
       paymentStatus: paymentIntent.status,
       isMalicious: isMalicious,
-      matchedHashes: matchedHashes, // Include matched hashes for malicious files
+      matchedHashes: matchedHashes,
       details: {
         description: isMalicious
           ? "The file contains potentially harmful content. Please avoid opening it."
@@ -382,16 +374,8 @@ const PORT = process.env.PORT || 3000
   try {
     console.log("Preparing server...")
 
-    // Try to download and parse malware data, but continue even if it fails
-    try {
-      await downloadAndExtractMalwareBazaar()
-      await parseMalwareBazaarCsv()
-    } catch (dataError) {
-      console.error("Error preparing malware data:", dataError)
-      console.log("Continuing with server startup...")
-    }
-
-    await loadMaliciousHashes()
+    // Load malware data
+    await loadMalwareData()
 
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`)

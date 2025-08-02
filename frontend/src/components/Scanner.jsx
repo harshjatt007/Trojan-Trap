@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import crypto from "crypto-js"
 import { analyzeFile, getRecommendation, getThreatLevelColor } from "../libs/scanUtils"
+import { uploadFile, apiCall, API_ENDPOINTS } from "../config/api"
 
 // Function to calculate file hash (SHA-256)
 const calculateFileHash = async (file) => {
@@ -89,28 +90,36 @@ const Scanner = () => {
       const scanIdValue = crypto.lib.WordArray.random(16).toString()
       setScanId(scanIdValue)
 
-      // Simulate API call delay with steps
-      const steps = [
-        { progress: 10, step: "initializing", delay: 800 },
-        { progress: 30, step: "analyzing file structure", delay: 1200 },
-        { progress: 50, step: "checking signatures", delay: 1500 },
-        { progress: 70, step: "deep scanning", delay: 1800 },
-        { progress: 90, step: "verifying results", delay: 1000 },
-      ]
-
-      // Execute each step with delays
-      for (const step of steps) {
-        setScanProgress(step.progress)
-        setScanStep(step.step)
-        await new Promise((resolve) => setTimeout(resolve, step.delay))
+      // Upload file to backend
+      setScanStep("uploading file")
+      setScanProgress(10)
+      
+      const uploadResult = await uploadFile(file)
+      
+      if (!uploadResult.success) {
+        throw new Error(uploadResult.error || "File upload failed")
       }
 
-      // Analyze the file for threats
-      const fileSize = file.size
-      const analysisResult = analyzeFile(file.name, hash, fileSize)
+      setScanProgress(30)
+      setScanStep("analyzing file structure")
 
-      // Get recommendations based on analysis
-      const recommendations = getRecommendation(analysisResult.status, analysisResult.threatLevel)
+      // Start the scan process
+      const scanResult = await apiCall(API_ENDPOINTS.SCAN_FILE, {
+        method: 'POST',
+        body: JSON.stringify({
+          scanId: scanIdValue,
+          fileName: file.name,
+          fileHash: hash,
+          fileSize: file.size
+        })
+      })
+
+      if (!scanResult.success) {
+        throw new Error(scanResult.error || "Scan failed")
+      }
+
+      setScanProgress(70)
+      setScanStep("verifying results")
 
       // Create the report
       const scanReport = {
@@ -118,14 +127,18 @@ const Scanner = () => {
         fileSize: `${(file.size / 1024).toFixed(2)} KB`,
         fileHash: hash,
         scannedAt: new Date().toISOString(),
-        scanStatus: analysisResult.status,
+        scanStatus: scanResult.scanStatus || "completed",
         fileType: file.name.split(".").pop().toUpperCase() || "UNKNOWN",
-        isMalicious: analysisResult.status === "malicious",
-        threatLevel: analysisResult.threatLevel,
-        detectionCount: analysisResult.detectionCount,
-        detectionCategories: analysisResult.detectionCategories,
-        threats: analysisResult.threats,
-        details: recommendations,
+        isMalicious: scanResult.isMalicious || false,
+        threatLevel: scanResult.threatLevel || "Low",
+        detectionCount: scanResult.detectionCount || 0,
+        detectionCategories: scanResult.detectionCategories || {},
+        threats: scanResult.threats || [],
+        details: scanResult.details || {
+          description: "Scan completed successfully.",
+          recommendation: "Review the results below."
+        },
+        scanId: scanIdValue
       }
 
       // Generate a report ID
@@ -139,6 +152,7 @@ const Scanner = () => {
 
       // Complete the scan
       setScanProgress(100)
+      setScanStep("finalizing")
     } catch (error) {
       console.error("Scan processing error:", error)
       setErrorMessage("An error occurred during scanning. Please try again.")

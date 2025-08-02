@@ -57,13 +57,35 @@ if (process.env.STRIPE_SECRET_KEY) {
 
 const app = express()
 app.use(express.json())
-app.use(
-  cors({
-    origin: ["http://localhost:5173", "https://trojan-trap-seven.vercel.app"],
-    methods: ["GET", "POST"],
-    credentials: true,
-  }),
-)
+
+// CORS configuration - allow all origins for deployment flexibility
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // List of allowed origins
+    const allowedOrigins = [
+      "http://localhost:5173",
+      "http://localhost:3000",
+      "https://trojan-trap-seven.vercel.app",
+      "https://trojan-trap.vercel.app",
+      // Add your Vercel deployment URL here after deployment
+      // "https://your-app-name.vercel.app"
+    ];
+    
+    // Check if the origin is in our allowed list or if it's undefined (for server-to-server requests)
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  methods: ["GET", "POST", "OPTIONS"],
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, "uploads")

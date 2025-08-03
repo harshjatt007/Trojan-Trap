@@ -33,6 +33,39 @@ const calculateFileHash = async (file) => {
   })
 }
 
+// Function to check if file requires payment before upload
+const checkFileRequirements = (file) => {
+  const fileSizeMB = file.size / (1024 * 1024);
+  const fileExtension = file.name.split('.').pop()?.toLowerCase();
+  const dangerousExtensions = ['exe', 'bat', 'cmd', 'com', 'pif', 'scr', 'vbs', 'js', 'jar', 'msi', 'dmg', 'app'];
+  
+  const isLargeFile = fileSizeMB > 50; // Files larger than 50MB require payment
+  const isPotentiallyDangerous = dangerousExtensions.includes(fileExtension);
+  
+  let requiresPayment = false;
+  let paymentReason = null;
+  let scanType = "basic";
+  
+  if (isLargeFile) {
+    requiresPayment = true;
+    paymentReason = `Large file (${fileSizeMB.toFixed(1)}MB) - Premium scan required`;
+    scanType = "premium";
+  } else if (isPotentiallyDangerous) {
+    requiresPayment = true;
+    paymentReason = `Potentially dangerous file type (.${fileExtension}) - Advanced scan required`;
+    scanType = "premium";
+  }
+  
+  return {
+    requiresPayment,
+    paymentReason,
+    scanType,
+    fileSizeMB: fileSizeMB.toFixed(1),
+    fileType: fileExtension,
+    isPotentiallyDangerous
+  };
+};
+
 const Scanner = () => {
   const [isUploading, setIsUploading] = useState(false)
   const [isScanning, setIsScanning] = useState(false)
@@ -94,40 +127,72 @@ const Scanner = () => {
       const scanIdValue = crypto.lib.WordArray.random(16).toString()
       setScanId(scanIdValue)
 
-      // Upload file to backend
-      setScanStep("uploading file")
-      setScanProgress(10)
+      // Pre-check file requirements before upload
+      setScanStep("checking file requirements")
+      setScanProgress(5)
       
-      const uploadResult = await uploadFile(file)
+      const fileRequirements = checkFileRequirements(file);
       
-      if (!uploadResult.success) {
-        throw new Error(uploadResult.error || "File upload failed")
-      }
-
-      // Check if payment is required
-      if (uploadResult.requiresPayment) {
+      // Check if payment is required BEFORE upload
+      if (fileRequirements.requiresPayment) {
         setScanStep("payment required")
         setScanProgress(50)
         
         // Show payment requirement message
-        setErrorMessage(`Premium scan required: ${uploadResult.paymentReason}. Please proceed with payment.`)
+        setErrorMessage(`Premium scan required: ${fileRequirements.paymentReason}. Please proceed with payment.`)
         
         // Create payment intent
         const paymentData = {
           fileName: file.name,
           fileSize: file.size,
-          fileType: uploadResult.fileType,
-          scanType: uploadResult.scanType
+          fileType: fileRequirements.fileType,
+          scanType: fileRequirements.scanType
         };
         
         const paymentIntentResult = await createPaymentIntent(paymentData);
         
         // Store payment info and show payment modal
         setPaymentIntent(paymentIntentResult);
-        setPendingUploadResult(uploadResult);
+        setPendingUploadResult(fileRequirements);
         setShowPaymentModal(true);
         
         return; // Stop here until payment is completed
+      }
+
+      // Upload file to backend (only for files that don't require payment)
+      setScanStep("uploading file")
+      setScanProgress(10)
+      
+      const uploadResult = await uploadFile(file)
+      
+      // Check if upload failed but requires payment
+      if (!uploadResult.success) {
+        if (uploadResult.requiresPayment) {
+          setScanStep("payment required")
+          setScanProgress(50)
+          
+          // Show payment requirement message
+          setErrorMessage(`Premium scan required: ${uploadResult.paymentReason}. Please proceed with payment.`)
+          
+          // Create payment intent
+          const paymentData = {
+            fileName: file.name,
+            fileSize: file.size,
+            fileType: fileRequirements.fileType,
+            scanType: uploadResult.scanType
+          };
+          
+          const paymentIntentResult = await createPaymentIntent(paymentData);
+          
+          // Store payment info and show payment modal
+          setPaymentIntent(paymentIntentResult);
+          setPendingUploadResult(uploadResult);
+          setShowPaymentModal(true);
+          
+          return; // Stop here until payment is completed
+        }
+        
+        throw new Error(uploadResult.error || "File upload failed")
       }
 
       setScanProgress(30)
@@ -283,11 +348,21 @@ const Scanner = () => {
     
     // Continue with the scan after successful payment
     if (pendingUploadResult && selectedFile) {
-      setScanStep("processing payment");
+      setScanStep("uploading file after payment");
       setScanProgress(60);
       
-      // Continue with the scan process
       try {
+        // Upload the file after payment
+        const uploadResult = await uploadFile(selectedFile);
+        
+        if (!uploadResult.success) {
+          throw new Error(uploadResult.error || "File upload failed");
+        }
+
+        setScanProgress(70);
+        setScanStep("processing premium scan");
+        
+        // Continue with the scan process
         const scanResult = await apiCall(API_ENDPOINTS.SCAN_FILE, {
           method: 'POST',
           body: JSON.stringify({
@@ -304,7 +379,7 @@ const Scanner = () => {
           throw new Error(scanResult.error || "Scan failed");
         }
 
-        setScanProgress(80);
+        setScanProgress(90);
         setScanStep("verifying results");
 
         // Create the premium report

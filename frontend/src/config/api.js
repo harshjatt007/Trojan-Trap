@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
 // API endpoints
 export const API_ENDPOINTS = {
@@ -54,6 +54,25 @@ export const uploadFile = async (file) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Upload failed with status:', response.status, 'Error:', errorText);
+      
+      // Try to parse the error response as JSON to check for payment requirements
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.requiresPayment) {
+          // Return the error data as a successful response with payment requirement
+          return {
+            success: false,
+            requiresPayment: true,
+            paymentReason: errorData.paymentReason,
+            scanType: errorData.scanType,
+            error: errorData.error,
+            details: errorData.details
+          };
+        }
+      } catch (parseError) {
+        // If parsing fails, continue with normal error handling
+      }
+      
       throw new Error(`Upload failed: ${response.status} - ${errorText}`);
     }
 

@@ -18,45 +18,62 @@ const __dirname = dirname(__filename)
 
 // Initialize Stripe with proper error handling
 let stripe
-if (process.env.STRIPE_SECRET_KEY) {
+
+// Check if we have a valid Stripe key (not a placeholder)
+const hasValidStripeKey = process.env.STRIPE_SECRET_KEY && 
+  process.env.STRIPE_SECRET_KEY.startsWith('sk_test_') && 
+  process.env.STRIPE_SECRET_KEY.length > 50 &&
+  !process.env.STRIPE_SECRET_KEY.includes('your_stripe_secret_key') &&
+  !process.env.STRIPE_SECRET_KEY.includes('placeholder') &&
+  !process.env.STRIPE_SECRET_KEY.includes('51H8XXL4e1p5m6K7J2ZV4Yp3Q3GQ2zX6Y9Kf8b0LkTq2A7M8P5L9bD3vF4J7L2N8V0Y5X')
+
+if (hasValidStripeKey) {
   try {
     stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
-    console.log("Stripe initialized successfully")
+    console.log("Stripe initialized successfully with real API key")
   } catch (error) {
     console.error("Failed to initialize Stripe:", error)
-    // Create a mock Stripe object for development
-    stripe = {
-      paymentIntents: {
-        create: async () => ({
-          id: "mock_payment_intent_" + crypto.randomBytes(8).toString("hex"),
-          client_secret: "mock_secret_" + crypto.randomBytes(16).toString("hex"),
-        }),
-        retrieve: async () => ({
-          status: "succeeded",
-        }),
-      },
-    }
-    console.log("Using mock Stripe service for development")
+    // Fall back to mock service
+    stripe = createMockStripe()
+    console.log("Using mock Stripe service due to initialization error")
   }
 } else {
-  console.error("STRIPE_SECRET_KEY environment variable is not set")
-  // Create a mock Stripe object for development
-  stripe = {
+  console.log("No valid STRIPE_SECRET_KEY found, using mock Stripe service for development")
+  stripe = createMockStripe()
+}
+
+// Helper function to create mock Stripe service
+function createMockStripe() {
+  return {
     paymentIntents: {
-      create: async () => ({
-        id: "mock_payment_intent_" + crypto.randomBytes(8).toString("hex"),
-        client_secret: "mock_secret_" + crypto.randomBytes(16).toString("hex"),
-      }),
-      retrieve: async () => ({
-        status: "succeeded",
-      }),
+      create: async (params) => {
+        console.log("Mock Stripe: Creating payment intent with params:", params)
+        return {
+          id: "mock_payment_intent_" + crypto.randomBytes(8).toString("hex"),
+          client_secret: "mock_secret_" + crypto.randomBytes(16).toString("hex"),
+          amount: params.amount,
+          currency: params.currency,
+          status: "requires_payment_method"
+        }
+      },
+      retrieve: async (paymentIntentId) => {
+        console.log("Mock Stripe: Retrieving payment intent:", paymentIntentId)
+        return {
+          id: paymentIntentId,
+          status: "succeeded",
+          amount: 1000,
+          currency: "inr"
+        }
+      },
     },
   }
-  console.log("Using mock Stripe service for development")
 }
 
 const app = express()
-app.use(express.json())
+
+// Increase payload size limits for large file uploads
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ limit: '500mb', extended: true }));
 
 // CORS configuration - simplified for deployment
 const corsOptions = {
@@ -209,6 +226,18 @@ app.post("/upload", (req, res) => {
   upload(req, res, async (err) => {
     if (err) {
       console.error('Upload error:', err);
+      
+      // Check if it's a file size error
+      if (err.code === 'LIMIT_FILE_SIZE' || err.message.includes('too large')) {
+        return res.status(400).json({ 
+          error: "File upload failed", 
+          details: "File too large for basic scan. Please use premium scan for large files.",
+          requiresPayment: true,
+          paymentReason: "Large file requires premium scan",
+          scanType: "premium"
+        });
+      }
+      
       return res.status(400).json({ 
         error: "File upload failed", 
         details: err.message 

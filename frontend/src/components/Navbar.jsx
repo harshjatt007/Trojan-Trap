@@ -12,7 +12,7 @@ const Navbar = () => {
     // Calculate positions for the active indicator
     const updateIndicator = () => {
       const currentPath = location.pathname
-      const activeIndex = ["/", "/scanner", "/report", "/docs", "/live-updates", "/test"].indexOf(currentPath)
+      const activeIndex = ["/", "/scanner", "/report", "/docs", "/live-updates"].indexOf(currentPath)
 
       if (activeIndex >= 0 && navRefs.current[activeIndex]) {
         const activeItem = navRefs.current[activeIndex]
@@ -82,14 +82,7 @@ const Navbar = () => {
             LIVE UPDATES
           </Link>
         </li>
-        <li
-          className="relative z-10 block cursor-pointer px-3 py-1.5 text-xs uppercase text-white mix-blend-difference md:px-5 md:py-3 md:text-base"
-          ref={(el) => (navRefs.current[5] = el)}
-        >
-          <Link className="no-underline text-inherit" to="/test">
-            TEST
-          </Link>
-        </li>
+
         <li
           className="absolute z-0 h-7 rounded-full bg-black md:h-12"
           style={{

@@ -7,7 +7,7 @@ import Scanner from "./components/Scanner"
 import Report from "./components/Report"
 import Docs from "./components/Docs"
 import LiveUpdates from "./components/LiveUpdates"
-import TestConnection from "./components/TestConnection"
+
 import { motion } from "framer-motion"
 import "./App.css"
 
@@ -28,7 +28,7 @@ function App() {
             <Route path="/report" element={<Report />} />
             <Route path="/docs" element={<Docs />} />
             <Route path="/live-updates" element={<LiveUpdates />} />
-            <Route path="/test" element={<TestConnection />} />
+
           </Routes>
         </motion.main>
         <footer className="py-4 text-center text-gray-600 text-sm">

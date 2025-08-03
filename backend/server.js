@@ -215,6 +215,69 @@ function calculateFileHash(filePath, algorithm = "sha256") {
 
 // Routes
 
+// Upload endpoint for frontend
+app.post("/upload", upload, (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "No file uploaded", details: "Please select a file to scan" })
+  }
+
+  // Return success response
+  return res.status(200).json({
+    success: true,
+    message: "File uploaded successfully"
+  })
+})
+
+// Scan endpoint for frontend
+app.post("/scan", (req, res) => {
+  // This endpoint is handled by the frontend using client-side analysis
+  // For now, we'll return a mock response
+  const { fileName, fileHash, fileSize } = req.body
+  
+  // Mock scan result
+  const isMalicious = Math.random() > 0.8 // 20% chance of being malicious for demo
+  const threatLevel = isMalicious ? "High" : "Low"
+  const detectionCount = isMalicious ? Math.floor(Math.random() * 15) + 10 : 0
+  
+  const scanResult = {
+    success: true,
+    scanStatus: isMalicious ? "malicious" : "clean",
+    isMalicious,
+    threatLevel,
+    detectionCount,
+    detectionCategories: {
+      virus: isMalicious ? Math.floor(Math.random() * 30) + 70 : 0,
+      spyware: isMalicious ? Math.floor(Math.random() * 70) + 30 : 0,
+      trojan: isMalicious ? Math.floor(Math.random() * 100) : 0,
+      ransomware: isMalicious ? Math.floor(Math.random() * 100) : 0,
+      adware: isMalicious ? Math.floor(Math.random() * 40) : 0,
+    },
+    threats: isMalicious ? [
+      {
+        name: "Malware.Generic." + Math.floor(Math.random() * 1000000),
+        category: "Malware",
+        severity: "high",
+      },
+      {
+        name: "Win32.Backdoor.Agent",
+        category: "Backdoor",
+        severity: "critical",
+      }
+    ] : [],
+    details: {
+      description: isMalicious 
+        ? "The file contains potentially harmful content. Please avoid opening it."
+        : "The file appears safe and does not contain any known threats.",
+      recommendation: isMalicious
+        ? "We recommend deleting the file immediately or running a malware scan on your system."
+        : "You can safely proceed with this file.",
+    }
+  }
+
+  return res.status(200).json(scanResult)
+})
+
+// Original scan-file endpoint for backward compatibility
 app.post("/scan-file", (req, res) => {
   upload(req, res, async (err) => {
     if (err) {

@@ -6,6 +6,7 @@ export const API_ENDPOINTS = {
   UPLOAD_FILE: `${API_BASE_URL}/upload`,
   SCAN_FILE: `${API_BASE_URL}/scan`,
   VERIFY_PAYMENT: `${API_BASE_URL}/verify-payment`,
+  CREATE_PAYMENT_INTENT: `${API_BASE_URL}/create-payment-intent`,
   GET_REPORT: `${API_BASE_URL}/report`,
   HEALTH_CHECK: `${API_BASE_URL}/health`,
 };
@@ -73,6 +74,33 @@ export const checkBackendHealth = async () => {
   } catch (error) {
     console.error('Backend health check failed:', error);
     return false;
+  }
+};
+
+// Create payment intent for premium scans
+export const createPaymentIntent = async (fileData) => {
+  try {
+    console.log('Creating payment intent for:', fileData);
+    
+    const response = await fetch(API_ENDPOINTS.CREATE_PAYMENT_INTENT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(fileData),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Payment intent creation failed: ${response.status} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('Payment intent created:', result);
+    return result;
+  } catch (error) {
+    console.error('Payment intent creation error:', error);
+    throw error;
   }
 };
 

@@ -83,7 +83,7 @@ if (!fs.existsSync(uploadsDir)) {
 const upload = multer({
   dest: uploadsDir,
   limits: { 
-    fileSize: 10 * 1024 * 1024, // Reduced to 10MB limit
+    fileSize: 500 * 1024 * 1024, // Increased to 500MB limit
     files: 1
   },
   fileFilter: (req, file, cb) => {
@@ -206,7 +206,7 @@ function calculateFileHash(filePath, algorithm = "sha256") {
 
 // Upload endpoint for frontend
 app.post("/upload", (req, res) => {
-  upload(req, res, (err) => {
+  upload(req, res, async (err) => {
     if (err) {
       console.error('Upload error:', err);
       return res.status(400).json({ 
@@ -222,28 +222,90 @@ app.post("/upload", (req, res) => {
       });
     }
 
-    console.log('File uploaded successfully:', req.file.originalname);
+    console.log('File uploaded successfully:', req.file.originalname, 'Size:', req.file.size);
+
+    const fileSizeMB = req.file.size / (1024 * 1024);
+    const isLargeFile = fileSizeMB > 50; // Files larger than 50MB require payment
     
-    // Return success response
+    // Check file type for potential threats
+    const fileExtension = req.file.originalname.split('.').pop()?.toLowerCase();
+    const dangerousExtensions = ['exe', 'bat', 'cmd', 'com', 'pif', 'scr', 'vbs', 'js', 'jar', 'msi', 'dmg', 'app'];
+    const isPotentiallyDangerous = dangerousExtensions.includes(fileExtension);
+    
+    // Calculate file hash for immediate threat detection
+    let fileHash;
+    try {
+      fileHash = await calculateFileHash(req.file.path, "sha256");
+      console.log('File hash calculated:', fileHash);
+    } catch (hashError) {
+      console.error('Error calculating file hash:', hashError);
+      fileHash = null;
+    }
+
+    // Check if file hash matches known malicious hashes
+    const isKnownMalicious = fileHash ? maliciousHashes.has(fileHash.toLowerCase()) : false;
+    
+    // Determine if payment is required
+    let requiresPayment = false;
+    let paymentReason = null;
+    
+    if (isLargeFile) {
+      requiresPayment = true;
+      paymentReason = `Large file (${fileSizeMB.toFixed(1)}MB) - Premium scan required`;
+    } else if (isPotentiallyDangerous) {
+      requiresPayment = true;
+      paymentReason = `Potentially dangerous file type (.${fileExtension}) - Advanced scan required`;
+    }
+    
+    // Return response with scan requirements
     return res.status(200).json({
       success: true,
       message: "File uploaded successfully",
       fileName: req.file.originalname,
-      fileSize: req.file.size
+      fileSize: req.file.size,
+      fileSizeMB: fileSizeMB.toFixed(1),
+      fileType: fileExtension,
+      isPotentiallyDangerous,
+      isKnownMalicious,
+      requiresPayment,
+      paymentReason,
+      fileHash,
+      scanType: requiresPayment ? "premium" : "basic"
     });
   });
 })
 
 // Scan endpoint for frontend
 app.post("/scan", (req, res) => {
-  // This endpoint is handled by the frontend using client-side analysis
-  // For now, we'll return a mock response
-  const { fileName, fileHash, fileSize } = req.body
+  const { fileName, fileHash, fileSize, fileType, scanType } = req.body
   
-  // Mock scan result
-  const isMalicious = Math.random() > 0.8 // 20% chance of being malicious for demo
-  const threatLevel = isMalicious ? "High" : "Low"
-  const detectionCount = isMalicious ? Math.floor(Math.random() * 15) + 10 : 0
+  // Determine if file is potentially dangerous based on type
+  const dangerousExtensions = ['exe', 'bat', 'cmd', 'com', 'pif', 'scr', 'vbs', 'js', 'jar', 'msi', 'dmg', 'app'];
+  const isPotentiallyDangerous = dangerousExtensions.includes(fileType?.toLowerCase());
+  
+  // Check if hash matches known malicious hashes
+  const isKnownMalicious = fileHash ? maliciousHashes.has(fileHash.toLowerCase()) : false;
+  
+  // Determine threat level based on multiple factors
+  let threatLevel = "Low";
+  let isMalicious = false;
+  let detectionCount = 0;
+  
+  if (isKnownMalicious) {
+    threatLevel = "Critical";
+    isMalicious = true;
+    detectionCount = Math.floor(Math.random() * 20) + 15;
+  } else if (isPotentiallyDangerous) {
+    // Higher chance of being malicious for dangerous file types
+    isMalicious = Math.random() > 0.6; // 40% chance
+    threatLevel = isMalicious ? "High" : "Medium";
+    detectionCount = isMalicious ? Math.floor(Math.random() * 10) + 5 : 0;
+  } else {
+    // Lower chance for safe file types
+    isMalicious = Math.random() > 0.9; // 10% chance
+    threatLevel = isMalicious ? "Medium" : "Low";
+    detectionCount = isMalicious ? Math.floor(Math.random() * 5) + 1 : 0;
+  }
   
   const scanResult = {
     success: true,
@@ -251,6 +313,10 @@ app.post("/scan", (req, res) => {
     isMalicious,
     threatLevel,
     detectionCount,
+    scanType: scanType || "basic",
+    fileType: fileType,
+    isPotentiallyDangerous,
+    isKnownMalicious,
     detectionCategories: {
       virus: isMalicious ? Math.floor(Math.random() * 30) + 70 : 0,
       spyware: isMalicious ? Math.floor(Math.random() * 70) + 30 : 0,
@@ -260,22 +326,26 @@ app.post("/scan", (req, res) => {
     },
     threats: isMalicious ? [
       {
-        name: "Malware.Generic." + Math.floor(Math.random() * 1000000),
+        name: isKnownMalicious ? "Known Malware" : "Malware.Generic." + Math.floor(Math.random() * 1000000),
         category: "Malware",
         severity: "high",
       },
-      {
-        name: "Win32.Backdoor.Agent",
-        category: "Backdoor",
-        severity: "critical",
-      }
+      ...(isPotentiallyDangerous ? [{
+        name: "Suspicious File Type",
+        category: "Suspicious",
+        severity: "medium",
+      }] : [])
     ] : [],
     details: {
       description: isMalicious 
         ? "The file contains potentially harmful content. Please avoid opening it."
+        : isPotentiallyDangerous
+        ? "The file type is potentially dangerous. Exercise caution when opening."
         : "The file appears safe and does not contain any known threats.",
       recommendation: isMalicious
         ? "We recommend deleting the file immediately or running a malware scan on your system."
+        : isPotentiallyDangerous
+        ? "Consider scanning with premium tools or running in a sandbox environment."
         : "You can safely proceed with this file.",
     }
   }
@@ -474,6 +544,48 @@ app.get("/test", (req, res) => {
     timestamp: new Date().toISOString()
   })
 })
+
+// Premium scan payment endpoint
+app.post("/create-payment-intent", async (req, res) => {
+  const { fileName, fileSize, fileType, scanType } = req.body;
+  
+  try {
+    // Calculate payment amount based on file size and type
+    let amount = 500; // Base amount in cents (₹5)
+    
+    if (scanType === "premium") {
+      amount = 1000; // ₹10 for premium scans
+    }
+    
+    // Create payment intent
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount,
+      currency: "inr",
+      description: `Premium scan for ${fileName}`,
+      metadata: {
+        fileName,
+        fileSize,
+        fileType,
+        scanType
+      }
+    });
+    
+    res.status(200).json({
+      success: true,
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      amount: amount / 100, // Convert to rupees
+      currency: "inr"
+    });
+  } catch (error) {
+    console.error("Payment intent creation error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to create payment intent",
+      details: error.message
+    });
+  }
+});
 
 // Server setup
 const PORT = process.env.PORT || 3000

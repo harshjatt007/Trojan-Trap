@@ -16,7 +16,8 @@ import {
   Zap,
 } from "lucide-react"
 import { analyzeFile, getRecommendation, getThreatLevelColor } from "../libs/scanUtils"
-import { uploadFile, apiCall, API_ENDPOINTS } from "../config/api"
+import { uploadFile, apiCall, API_ENDPOINTS, createPaymentIntent } from "../config/api"
+import PaymentModal from "./PaymentModal"
 import * as crypto from "crypto-js"
 
 // Function to calculate file hash (SHA-256)
@@ -44,6 +45,9 @@ const Scanner = () => {
   const [scanId, setScanId] = useState(null)
   const [reportId, setReportId] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [paymentIntent, setPaymentIntent] = useState(null)
+  const [pendingUploadResult, setPendingUploadResult] = useState(null)
   const navigate = useNavigate()
 
   // Progress bar animation
@@ -100,17 +104,45 @@ const Scanner = () => {
         throw new Error(uploadResult.error || "File upload failed")
       }
 
+      // Check if payment is required
+      if (uploadResult.requiresPayment) {
+        setScanStep("payment required")
+        setScanProgress(50)
+        
+        // Show payment requirement message
+        setErrorMessage(`Premium scan required: ${uploadResult.paymentReason}. Please proceed with payment.`)
+        
+        // Create payment intent
+        const paymentData = {
+          fileName: file.name,
+          fileSize: file.size,
+          fileType: uploadResult.fileType,
+          scanType: uploadResult.scanType
+        };
+        
+        const paymentIntentResult = await createPaymentIntent(paymentData);
+        
+        // Store payment info and show payment modal
+        setPaymentIntent(paymentIntentResult);
+        setPendingUploadResult(uploadResult);
+        setShowPaymentModal(true);
+        
+        return; // Stop here until payment is completed
+      }
+
       setScanProgress(30)
       setScanStep("analyzing file structure")
 
-      // Start the scan process
+      // Start the scan process with enhanced data
       const scanResult = await apiCall(API_ENDPOINTS.SCAN_FILE, {
         method: 'POST',
         body: JSON.stringify({
           scanId: scanIdValue,
           fileName: file.name,
           fileHash: hash,
-          fileSize: file.size
+          fileSize: file.size,
+          fileType: uploadResult.fileType,
+          scanType: uploadResult.scanType || "basic"
         })
       })
 
@@ -121,19 +153,22 @@ const Scanner = () => {
       setScanProgress(70)
       setScanStep("verifying results")
 
-      // Create the report
+      // Create the report with enhanced information
       const scanReport = {
         fileName: file.name,
         fileSize: `${(file.size / 1024).toFixed(2)} KB`,
         fileHash: hash,
         scannedAt: new Date().toISOString(),
         scanStatus: scanResult.scanStatus || "completed",
-        fileType: file.name.split(".").pop().toUpperCase() || "UNKNOWN",
+        fileType: scanResult.fileType || file.name.split(".").pop().toUpperCase() || "UNKNOWN",
         isMalicious: scanResult.isMalicious || false,
         threatLevel: scanResult.threatLevel || "Low",
         detectionCount: scanResult.detectionCount || 0,
         detectionCategories: scanResult.detectionCategories || {},
         threats: scanResult.threats || [],
+        isPotentiallyDangerous: scanResult.isPotentiallyDangerous || false,
+        isKnownMalicious: scanResult.isKnownMalicious || false,
+        scanType: scanResult.scanType || "basic",
         details: scanResult.details || {
           description: "Scan completed successfully.",
           recommendation: "Review the results below."
@@ -237,7 +272,83 @@ const Scanner = () => {
     setReport(null)
     setScanProgress(0)
     setErrorMessage("")
+    setShowPaymentModal(false)
+    setPaymentIntent(null)
+    setPendingUploadResult(null)
   }
+
+  const handlePaymentSuccess = async (confirmedPaymentIntent) => {
+    setShowPaymentModal(false);
+    setErrorMessage("");
+    
+    // Continue with the scan after successful payment
+    if (pendingUploadResult && selectedFile) {
+      setScanStep("processing payment");
+      setScanProgress(60);
+      
+      // Continue with the scan process
+      try {
+        const scanResult = await apiCall(API_ENDPOINTS.SCAN_FILE, {
+          method: 'POST',
+          body: JSON.stringify({
+            scanId: scanId,
+            fileName: selectedFile.name,
+            fileHash: fileHash,
+            fileSize: selectedFile.size,
+            fileType: pendingUploadResult.fileType,
+            scanType: "premium"
+          })
+        });
+
+        if (!scanResult.success) {
+          throw new Error(scanResult.error || "Scan failed");
+        }
+
+        setScanProgress(80);
+        setScanStep("verifying results");
+
+        // Create the premium report
+        const scanReport = {
+          fileName: selectedFile.name,
+          fileSize: `${(selectedFile.size / 1024).toFixed(2)} KB`,
+          fileHash: fileHash,
+          scannedAt: new Date().toISOString(),
+          scanStatus: scanResult.scanStatus || "completed",
+          fileType: scanResult.fileType || selectedFile.name.split(".").pop().toUpperCase() || "UNKNOWN",
+          isMalicious: scanResult.isMalicious || false,
+          threatLevel: scanResult.threatLevel || "Low",
+          detectionCount: scanResult.detectionCount || 0,
+          detectionCategories: scanResult.detectionCategories || {},
+          threats: scanResult.threats || [],
+          isPotentiallyDangerous: scanResult.isPotentiallyDangerous || false,
+          isKnownMalicious: scanResult.isKnownMalicious || false,
+          scanType: "premium",
+          paymentStatus: "completed",
+          paymentIntentId: confirmedPaymentIntent.id,
+          details: scanResult.details || {
+            description: "Premium scan completed successfully.",
+            recommendation: "Review the results below."
+          },
+          scanId: scanId
+        };
+
+        const reportIdValue = crypto.lib.WordArray.random(16).toString();
+        setReportId(reportIdValue);
+
+        setReport(scanReport);
+        localStorage.setItem("scanReport", JSON.stringify(scanReport));
+        localStorage.setItem("reportId", reportIdValue);
+
+        setScanProgress(100);
+        setScanStep("finalizing");
+      } catch (error) {
+        console.error("Premium scan error:", error);
+        setErrorMessage("An error occurred during premium scanning. Please try again.");
+      } finally {
+        setIsScanning(false);
+      }
+    }
+  };
 
   // Render threat categories as a bar chart
   const renderThreatCategories = (categories) => {
@@ -502,6 +613,14 @@ const Scanner = () => {
 
       {/* Report */}
       {report && formatReport(report)}
+
+      {/* Payment Modal */}
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        paymentIntent={paymentIntent}
+        onPaymentSuccess={handlePaymentSuccess}
+      />
     </div>
   )
 }

@@ -71,11 +71,13 @@ const corsOptions = {
       "https://trojan-trap-seven.vercel.app",
       "https://trojan-trap.vercel.app",
       // Add your Vercel deployment URL here after deployment
-      // "https://your-app-name.vercel.app"
-    ];
+      // Replace with your actual frontend URL when deployed
+      process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : []
+    ].flat();
     
     // Check if the origin is in our allowed list or if it's undefined (for server-to-server requests)
-    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+    // In production, we check against the environment variable
+    if (allowedOrigins.includes(origin) || !origin || allowedOrigins.includes("*")) {
       callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));

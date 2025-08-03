@@ -31,6 +31,7 @@ In your Render service dashboard, go to "Environment" tab and add:
 ```
 STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
 PORT=3000
+ALLOWED_ORIGINS=https://your-frontend-name.vercel.app
 ```
 
 ### Step 3: Deploy

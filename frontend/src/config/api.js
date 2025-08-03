@@ -7,6 +7,8 @@ export const API_ENDPOINTS = {
   SCAN_FILE: `${API_BASE_URL}/scan`,
   VERIFY_PAYMENT: `${API_BASE_URL}/verify-payment`,
   CREATE_PAYMENT_INTENT: `${API_BASE_URL}/create-payment-intent`,
+  CREATE_UPI_PAYMENT: `${API_BASE_URL}/create-upi-payment`,
+  VERIFY_UPI_PAYMENT: `${API_BASE_URL}/verify-upi-payment`,
   GET_REPORT: `${API_BASE_URL}/report`,
   HEALTH_CHECK: `${API_BASE_URL}/health`,
 };
@@ -119,6 +121,60 @@ export const createPaymentIntent = async (fileData) => {
     return result;
   } catch (error) {
     console.error('Payment intent creation error:', error);
+    throw error;
+  }
+};
+
+// Create UPI payment for premium scans
+export const createUpiPayment = async (fileData) => {
+  try {
+    console.log('Creating UPI payment for:', fileData);
+    
+    const response = await fetch(API_ENDPOINTS.CREATE_UPI_PAYMENT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(fileData),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`UPI payment creation failed: ${response.status} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('UPI payment created:', result);
+    return result;
+  } catch (error) {
+    console.error('UPI payment creation error:', error);
+    throw error;
+  }
+};
+
+// Verify UPI payment
+export const verifyUpiPayment = async (paymentData) => {
+  try {
+    console.log('Verifying UPI payment:', paymentData);
+    
+    const response = await fetch(API_ENDPOINTS.VERIFY_UPI_PAYMENT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(paymentData),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`UPI payment verification failed: ${response.status} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('UPI payment verified:', result);
+    return result;
+  } catch (error) {
+    console.error('UPI payment verification error:', error);
     throw error;
   }
 };

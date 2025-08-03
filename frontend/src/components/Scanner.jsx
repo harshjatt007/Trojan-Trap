@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import { analyzeFile, getRecommendation, getThreatLevelColor } from "../libs/scanUtils"
 import { uploadFile, apiCall, API_ENDPOINTS } from "../config/api"
+import * as crypto from "crypto-js"
 
 // Function to calculate file hash (SHA-256)
 const calculateFileHash = async (file) => {

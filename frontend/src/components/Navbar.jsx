@@ -12,7 +12,7 @@ const Navbar = () => {
     // Calculate positions for the active indicator
     const updateIndicator = () => {
       const currentPath = location.pathname
-      const activeIndex = ["/", "/report", "/docs", "/live-updates"].indexOf(currentPath)
+      const activeIndex = ["/", "/scanner", "/report", "/docs", "/live-updates", "/test"].indexOf(currentPath)
 
       if (activeIndex >= 0 && navRefs.current[activeIndex]) {
         const activeItem = navRefs.current[activeIndex]
@@ -50,13 +50,21 @@ const Navbar = () => {
           className="relative z-10 block cursor-pointer px-3 py-1.5 text-xs uppercase text-white mix-blend-difference md:px-5 md:py-3 md:text-base"
           ref={(el) => (navRefs.current[1] = el)}
         >
+          <Link className="no-underline text-inherit" to="/scanner">
+            Scanner
+          </Link>
+        </li>
+        <li
+          className="relative z-10 block cursor-pointer px-3 py-1.5 text-xs uppercase text-white mix-blend-difference md:px-5 md:py-3 md:text-base"
+          ref={(el) => (navRefs.current[2] = el)}
+        >
           <Link className="no-underline text-inherit" to="/report">
             Report
           </Link>
         </li>
         <li
           className="relative z-10 block cursor-pointer px-3 py-1.5 text-xs uppercase text-white mix-blend-difference md:px-5 md:py-3 md:text-base"
-          ref={(el) => (navRefs.current[2] = el)}
+          ref={(el) => (navRefs.current[3] = el)}
         >
           <Link className="no-underline text-inherit" to="/docs">
             Docs
@@ -64,7 +72,7 @@ const Navbar = () => {
         </li>
         <li
           className="relative z-10 block cursor-pointer px-3 py-1.5 text-xs uppercase text-white mix-blend-difference md:px-5 md:py-3 md:text-base"
-          ref={(el) => (navRefs.current[3] = el)}
+          ref={(el) => (navRefs.current[4] = el)}
         >
           <Link className="no-underline text-inherit" to="/live-updates">
             <span className="absolute inline-flex top-[42.4%] left-[91%] items-center">
@@ -72,6 +80,14 @@ const Navbar = () => {
               <span className="relative inline-flex h-2 w-2 rounded-full bg-pink-500"></span>
             </span>
             LIVE UPDATES
+          </Link>
+        </li>
+        <li
+          className="relative z-10 block cursor-pointer px-3 py-1.5 text-xs uppercase text-white mix-blend-difference md:px-5 md:py-3 md:text-base"
+          ref={(el) => (navRefs.current[5] = el)}
+        >
+          <Link className="no-underline text-inherit" to="/test">
+            TEST
           </Link>
         </li>
         <li

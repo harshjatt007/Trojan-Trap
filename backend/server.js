@@ -58,36 +58,21 @@ if (process.env.STRIPE_SECRET_KEY) {
 const app = express()
 app.use(express.json())
 
-// CORS configuration - allow all origins for deployment flexibility
+// CORS configuration - simplified for deployment
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // List of allowed origins
-    const allowedOrigins = [
-      "http://localhost:5173",
-      "http://localhost:3000",
-      "https://trojan-trap-seven.vercel.app",
-      "https://trojan-trap.vercel.app",
-      // Add your Vercel deployment URL here after deployment
-      // Replace with your actual frontend URL when deployed
-      process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : []
-    ].flat();
-    
-    // Check if the origin is in our allowed list or if it's undefined (for server-to-server requests)
-    // In production, we check against the environment variable
-    if (allowedOrigins.includes(origin) || !origin || allowedOrigins.includes("*")) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
+  origin: true, // Allow all origins for now to fix the issue
   methods: ["GET", "POST", "OPTIONS"],
   credentials: true,
+  optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
+
+// Add error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({ error: 'Internal server error', details: err.message });
+});
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, "uploads")
@@ -97,9 +82,13 @@ if (!fs.existsSync(uploadsDir)) {
 
 const upload = multer({
   dest: uploadsDir,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
+  limits: { 
+    fileSize: 10 * 1024 * 1024, // Reduced to 10MB limit
+    files: 1
+  },
   fileFilter: (req, file, cb) => {
-    cb(null, true) // Accept all
+    // Accept all file types for now
+    cb(null, true)
   },
 }).single("file")
 
@@ -216,16 +205,33 @@ function calculateFileHash(filePath, algorithm = "sha256") {
 // Routes
 
 // Upload endpoint for frontend
-app.post("/upload", upload, (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "No file uploaded", details: "Please select a file to scan" })
-  }
+app.post("/upload", (req, res) => {
+  upload(req, res, (err) => {
+    if (err) {
+      console.error('Upload error:', err);
+      return res.status(400).json({ 
+        error: "File upload failed", 
+        details: err.message 
+      });
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({ 
+        error: "No file uploaded", 
+        details: "Please select a file to scan" 
+      });
+    }
 
-  // Return success response
-  return res.status(200).json({
-    success: true,
-    message: "File uploaded successfully"
-  })
+    console.log('File uploaded successfully:', req.file.originalname);
+    
+    // Return success response
+    return res.status(200).json({
+      success: true,
+      message: "File uploaded successfully",
+      fileName: req.file.originalname,
+      fileSize: req.file.size
+    });
+  });
 })
 
 // Scan endpoint for frontend
@@ -452,7 +458,21 @@ app.get("/report/:reportId", (req, res) => {
 
 // Add a simple health check endpoint
 app.get("/health", (req, res) => {
-  res.status(200).json({ status: "ok", message: "Server is running" })
+  res.status(200).json({ 
+    status: "ok", 
+    message: "Server is running",
+    timestamp: new Date().toISOString(),
+    cors: "enabled"
+  })
+})
+
+// Test endpoint for debugging
+app.get("/test", (req, res) => {
+  res.status(200).json({ 
+    message: "Backend is accessible",
+    cors: "working",
+    timestamp: new Date().toISOString()
+  })
 })
 
 // Server setup

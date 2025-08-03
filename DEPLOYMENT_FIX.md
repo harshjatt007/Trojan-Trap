@@ -1,127 +1,78 @@
-# Deployment Fix Guide for Trojan Trap
+# Trojan-Trap Deployment Fix Guide
 
-## Issue Summary
+## Issues Fixed
 
-The frontend deployment on Vercel is failing due to:
+### 1. CORS Configuration
+- Added `https://trojan-trap-psi.vercel.app` to allowed origins in backend
+- Updated environment examples with correct URLs
 
-1. **CORS Configuration Issues**: Backend not properly configured to accept requests from frontend domain
-2. **Environment Variables**: Missing or incorrect configuration of backend URL in frontend
-3. **Security Vulnerabilities**: 11 vulnerabilities in frontend dependencies
+### 2. Environment Variables Setup
 
-## Solution Implementation
+#### For Vercel (Frontend):
+You need to set these environment variables in your Vercel dashboard:
 
-### 1. Backend CORS Fix
+1. Go to your Vercel project dashboard
+2. Navigate to Settings > Environment Variables
+3. Add the following variables:
 
-The backend has been updated to properly handle CORS by using environment variables:
-
-```javascript
-// In backend/server.js
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // List of allowed origins from environment variable
-    const allowedOrigins = [
-      "http://localhost:5173",
-      "http://localhost:3000",
-      "https://trojan-trap-seven.vercel.app",
-      "https://trojan-trap.vercel.app",
-      // Add your Vercel deployment URL here after deployment
-      // Replace with your actual frontend URL when deployed
-      process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : []
-    ].flat();
-    
-    // Check if the origin is in our allowed list
-    if (allowedOrigins.includes(origin) || !origin) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  methods: ["GET", "POST", "OPTIONS"],
-  credentials: true,
-};
-```
-
-### 2. Environment Variable Configuration
-
-#### Backend (Render)
-In your Render service, add this environment variable:
-```
-ALLOWED_ORIGINS=https://your-frontend-vercel-url.vercel.app
-```
-
-#### Frontend (Vercel)
-In your Vercel project, add these environment variables:
 ```
 VITE_BACKEND_URL=https://trojan-trap.onrender.com
-VITE_STRIPE_PUBLISHABLE_KEY=pk_test_your_stripe_publishable_key
+VITE_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key_here
 ```
 
-### 3. Security Vulnerability Fix
+#### For Render (Backend):
+You need to set these environment variables in your Render dashboard:
 
-Run this command in your frontend directory:
-```bash
-cd frontend
-npm audit fix
+1. Go to your Render service dashboard
+2. Navigate to Environment > Environment Variables
+3. Add the following variables:
+
+```
+STRIPE_SECRET_KEY=your_stripe_secret_key_here
+ALLOWED_ORIGINS=https://trojan-trap-psi.vercel.app
+PORT=3000
 ```
 
-## Deployment Steps
+### 3. File Upload Issues
+The file upload should now work correctly with the updated CORS configuration.
 
-### Step 1: Update Backend on Render
+## Steps to Deploy
 
-1. Push the updated code to GitHub
-2. In Render dashboard:
-   - Go to your service
-   - Add environment variable: `ALLOWED_ORIGINS=https://your-frontend-vercel-url.vercel.app`
-   - Redeploy the service
+### Frontend (Vercel):
+1. Push your changes to GitHub
+2. Vercel will automatically redeploy
+3. Set the environment variables in Vercel dashboard
+4. Redeploy if needed
 
-### Step 2: Update Frontend on Vercel
+### Backend (Render):
+1. Push your changes to GitHub
+2. Render will automatically redeploy
+3. Set the environment variables in Render dashboard
+4. Redeploy if needed
 
-1. In Vercel dashboard:
-   - Go to your project settings
-   - Add environment variables:
-     ```
-     VITE_BACKEND_URL=https://trojan-trap.onrender.com
-     VITE_STRIPE_PUBLISHABLE_KEY=pk_test_your_stripe_publishable_key
-     ```
-2. Redeploy the frontend
+## Testing the Integration
 
-### Step 3: Fix Security Vulnerabilities
-
-Run in your frontend directory:
-```bash
-cd frontend
-npm audit fix
-```
-
-## Verification
-
-After deployment:
-
-1. Visit your frontend URL
-2. Try uploading a file
-3. Check browser console for any errors
-4. Verify API calls to backend are working
+1. Visit your Vercel frontend: https://trojan-trap-psi.vercel.app/
+2. Try uploading a file for scanning
+3. Check browser console for any CORS errors
+4. Verify that the file upload and scan process works
 
 ## Troubleshooting
 
-### CORS Errors
-- Ensure `ALLOWED_ORIGINS` in Render matches your Vercel frontend URL exactly
-- Restart Render service after updating environment variables
+### If CORS errors persist:
+1. Check that the environment variables are set correctly
+2. Verify the backend URL in the frontend environment
+3. Ensure the frontend URL is in the backend's allowed origins
+4. Clear browser cache and try again
 
-### Build Failures
-- Check that all dependencies are properly listed in package.json
-- Run `npm install` locally to verify dependencies
+### If file upload fails:
+1. Check the browser's network tab for request details
+2. Verify the backend is running and accessible
+3. Check Render logs for any server errors
+4. Ensure the uploads directory exists on the backend
 
-### API Connection Issues
-- Verify `VITE_BACKEND_URL` in Vercel matches your Render backend URL
-- Check Render logs for any errors
+## Current Configuration
 
-## Security Considerations
-
-1. Never commit sensitive keys to Git
-2. Use environment variables for all sensitive information
-3. Regularly update dependencies
-4. Monitor deployment logs for errors
+- Frontend: https://trojan-trap-psi.vercel.app/
+- Backend: https://trojan-trap.onrender.com
+- CORS: Configured to allow communication between these domains

@@ -1,147 +1,178 @@
-# Trojan Trap
+# Trojan-Trap: Advanced Malware Scanner
 
-A malware scanning application that allows users to upload files for security analysis.
+A comprehensive malware detection system with real-time scanning, threat analysis, and detailed reporting.
 
-## Features
+## 🌟 Features
 
-- File upload and scanning
-- Malware detection using hash comparison
-- Payment integration with Stripe
-- Detailed scan reports
-- Responsive design
+- **Real-time File Scanning**: Upload and scan files for malware threats
+- **Advanced Threat Detection**: Multiple detection engines and signature matching
+- **Detailed Reports**: Comprehensive threat analysis and recommendations
+- **Modern UI**: Beautiful, responsive interface built with React and Tailwind CSS
+- **Secure Payments**: Integrated Stripe payment processing
+- **Cloud Deployment**: Ready for Vercel and Render deployment
 
-## Project Structure
-
-```
-├── backend/
-│   ├── server.js          # Main server file
-│   ├── package.json       # Backend dependencies
-│   └── uploads/           # Directory for uploaded files
-└── frontend/
-    ├── src/               # Frontend source code
-    ├── package.json       # Frontend dependencies
-    └── vite.config.js      # Vite configuration
-```
-
-## Setup Instructions
+## 🚀 Quick Start
 
 ### Prerequisites
-
-- Node.js (v14 or higher)
+- Node.js >= 18.0.0
 - npm or yarn
+- Stripe account (for payments)
 
-### Backend Setup
+### Local Development
 
-1. Navigate to the backend directory:
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/harshjatt007/Trojan-Trap.git
+   cd Trojan-Trap
    ```
+
+2. **Backend Setup**
+   ```bash
    cd backend
-   ```
-
-2. Install dependencies:
-   ```
    npm install
-   ```
-
-3. Create a `.env` file with your Stripe keys:
-   ```
-   STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
-   ```
-
-4. Start the server:
-   ```
+   cp env.example .env
+   # Edit .env with your Stripe keys
    npm start
    ```
-   or
-   ```
-   node server.js
-   ```
 
-### Frontend Setup
-
-1. Navigate to the frontend directory:
-   ```
+3. **Frontend Setup**
+   ```bash
    cd frontend
-   ```
-
-2. Install dependencies:
-   ```
    npm install
-   ```
-
-3. Create a `.env` file with your Stripe keys:
-   ```
-   VITE_STRIPE_PUBLISHABLE_KEY=pk_test_your_stripe_publishable_key
-   VITE_BACKEND_URL=http://localhost:3000
-   ```
-
-4. Start the development server:
-   ```
+   cp env.example .env
+   # Edit .env with your backend URL and Stripe keys
    npm run dev
    ```
 
-5. Build for production:
+4. **Access the application**
+   - Frontend: http://localhost:5173
+   - Backend: http://localhost:3000
+
+## 🌐 Deployment
+
+### Frontend (Vercel)
+
+1. **Connect to Vercel**
+   - Push your code to GitHub
+   - Connect your repository to Vercel
+   - Set environment variables in Vercel dashboard:
+     ```
+     VITE_BACKEND_URL=https://your-backend-name.onrender.com
+     VITE_STRIPE_PUBLISHABLE_KEY=pk_test_your_stripe_key
+     ```
+
+2. **Deploy**
+   - Vercel will automatically deploy on push
+   - Your app will be available at: `https://your-app-name.vercel.app`
+
+### Backend (Render)
+
+1. **Create Render Service**
+   - Connect your GitHub repository
+   - Set build command: `npm install`
+   - Set start command: `node server.js`
+
+2. **Environment Variables**
+   Add these in Render dashboard:
    ```
-   npm run build
+   STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
+   ALLOWED_ORIGINS=https://your-frontend-name.vercel.app
+   PORT=3000
    ```
 
-## Deployment
+3. **Deploy**
+   - Render will automatically deploy
+   - Your backend will be available at: `https://your-service-name.onrender.com`
 
-This project is configured for deployment with:
-- **Frontend**: Vercel (React + Vite)
-- **Backend**: Render (Node.js + Express)
+## 🔧 Configuration
 
-### Quick Deploy
+### Environment Variables
 
-1. **Fork/Clone** this repository to your GitHub account
-2. **Deploy Backend** on Render:
-   - Connect your GitHub repo
-   - Set Root Directory to `backend`
-   - Add environment variables (see [DEPLOYMENT.md](DEPLOYMENT.md))
-3. **Deploy Frontend** on Vercel:
-   - Import your GitHub repo
-   - Set Root Directory to `frontend`
-   - Add environment variables (see [DEPLOYMENT.md](DEPLOYMENT.md))
+#### Frontend (.env)
+```env
+VITE_BACKEND_URL=https://your-backend-name.onrender.com
+VITE_STRIPE_PUBLISHABLE_KEY=pk_test_your_stripe_key
+```
 
-For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
+#### Backend (.env)
+```env
+STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
+ALLOWED_ORIGINS=https://your-frontend-name.vercel.app
+PORT=3000
+```
 
-## Stripe Integration
+## 🛠️ API Endpoints
 
-This application uses Stripe for payment processing:
+- `POST /upload` - Upload file for scanning
+- `POST /scan` - Scan uploaded file
+- `POST /verify-payment` - Verify payment and get results
+- `GET /report/:reportId` - Get scan report
+- `GET /health` - Health check
 
-1. Sign up for a Stripe account at [stripe.com](https://stripe.com)
-2. Get your API keys from the Stripe Dashboard
-3. Add the keys to your `.env` files as shown in the setup instructions
+## 🔍 Troubleshooting
 
-For testing, you can use Stripe's test card numbers:
-- Card: 4242 4242 4242 4242
-- Expiry: Any future date
-- CVC: Any 3 digits
+### CORS Errors
+- Ensure `ALLOWED_ORIGINS` in backend includes your frontend URL
+- Check that environment variables are set correctly
+- Clear browser cache and try again
 
-## Malware Data
+### File Upload Issues
+- Verify backend is running and accessible
+- Check file size limits (50MB max)
+- Ensure uploads directory exists on backend
 
-The application uses malware hash databases for detection. You can include:
-- `MalwareBazaar.zip` containing the full.csv file
-- Or place `full.csv` directly in the backend directory
+### Payment Issues
+- Verify Stripe keys are correct
+- Check Stripe dashboard for payment status
+- Ensure currency and amount are properly configured
 
-## Contributing
+### Deployment Issues
+- Check build logs for errors
+- Verify all environment variables are set
+- Ensure Node.js version compatibility
+
+## 📁 Project Structure
+
+```
+Trojan-Trap/
+├── backend/                 # Express.js backend
+│   ├── server.js           # Main server file
+│   ├── package.json        # Backend dependencies
+│   └── uploads/            # File upload directory
+├── frontend/               # React frontend
+│   ├── src/
+│   │   ├── components/     # React components
+│   │   ├── config/         # API configuration
+│   │   └── libs/           # Utility functions
+│   ├── package.json        # Frontend dependencies
+│   └── vite.config.js      # Vite configuration
+└── README.md              # This file
+```
+
+## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a pull request
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
-## License
+## 📄 License
 
-This project is licensed under the MIT License.
-   npm run build
-   npm run dev
-   VITE_BACKEND_URL=http://localhost:3000
-   npm install
-   cd frontend
-   STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
-   npm install
-   cd backend
-    └── vite.config.js      # Vite configuration
-## Project Structure
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🆘 Support
+
+If you encounter any issues:
+
+1. Check the troubleshooting section above
+2. Review the deployment logs
+3. Open an issue on GitHub
+4. Check the browser console for errors
+
+## 🔗 Links
+
+- **Live Demo**: [https://trojan-trap-psi.vercel.app/](https://trojan-trap-psi.vercel.app/)
+- **Backend**: [https://trojan-trap.onrender.com](https://trojan-trap.onrender.com)
+- **GitHub**: [https://github.com/harshjatt007/Trojan-Trap](https://github.com/harshjatt007/Trojan-Trap)
 

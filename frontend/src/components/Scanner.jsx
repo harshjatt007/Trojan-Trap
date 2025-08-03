@@ -15,7 +15,7 @@ import {
   AlertTriangle,
   Zap,
 } from "lucide-react"
-import crypto from "crypto-js"
+import * as crypto from "crypto-js"
 import { analyzeFile, getRecommendation, getThreatLevelColor } from "../libs/scanUtils"
 import { uploadFile, apiCall, API_ENDPOINTS } from "../config/api"
 
